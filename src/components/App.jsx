@@ -5,11 +5,10 @@ import { WagmiConfig, configureChains, createClient } from 'wagmi';
 import { sepolia } from 'wagmi/chains';
 import { publicProvider } from 'wagmi/providers/public';
 
-import Home from '../pages/Home';
-import Styleguide from '../pages/Styleguide';
-
 import Header from './layout/Header';
 import Footer from './layout/Footer';
+
+import Wallet from '../pages/Wallet';
 
 function App() {
   const { provider } = configureChains([sepolia], [publicProvider()]);
@@ -26,8 +25,7 @@ function App() {
           <Header />
           <div className="main">
             <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="styleguide" element={<Styleguide />} />
+              <Route path="/" element={<Wallet />} />
             </Routes>
           </div>
           <Footer />

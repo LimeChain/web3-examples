@@ -1,6 +1,6 @@
-# LimeAcademy examples
+# 👶 LimeAcademy Basic Web3 example
 
-Few examples for LimeAcademy.
+Very basic contract interaction example.
 
 ## 📌 Prerequisites
 
@@ -21,6 +21,35 @@ For optimal developer friendly experience use [Visual Studio Code](https://code.
 - [ES7+ React/Redux/React-Native snippets](https://marketplace.visualstudio.com/items?itemName=dsznajder.es7-react-js-snippets) - React code snippets and autocomplete
 
 A Web3 wallet is required as well. In our case we use [Metamask](https://metamask.io/). Project contracts are deployed at [Sepolia test network](https://metamask.zendesk.com/hc/en-us/articles/360059213492-ETH-on-Sepolia-and-Goerli-networks-testnets-) so please [change](https://medium.com/@mwhc00/how-to-enable-ethereum-test-networks-on-metamask-again-d7831da23a09) to that network in Metamask.
+
+## ⚙️ Install dependencies
+
+```shell
+yarn
+```
+
+or
+
+```shell
+npm i
+```
+
+## 🚀 Available Scripts
+
+In the project directory, you can run:
+
+```shell
+yarn start
+```
+
+or
+
+```shell
+npm start
+```
+
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
 
 ## 🗄 Project description, structure and functionalities
 
@@ -110,31 +139,41 @@ const { connect, isLoading } = useConnect({
 });
 ```
 
-## ⚙️ Install dependencies
+**Contract initialisation & interaction**
+For contract interaction we are using a library called [ethers.js](https://docs.ethers.org/v5/).
+This logic is in `src/pages/Wallet.jsx`.
+In order to create a contract object we initialise the `Contract` class from the `ethers` library:
 
-```shell
-yarn
+```javascript
+const _contract = new ethers.Contract(
+  '0x9D9955688649A7071a032DBf1e565023E6775690',
+  walletABI,
+  signer,
+);
 ```
 
-or
+The first argument is the contract address, in our case is deployed at Sepolia test network.
+The second argument is the contract ABI, which is compiled from the contract itself. It's a `.json` file describing all the properties and functions of the contract.
+The third one is the `signer` object get from the `useSigner()` hook provided by `wagmi`:
 
-```shell
-npm i
+```javascript
+const { data: signer } = useSigner();
 ```
 
-## 🚀 Available Scripts
+After we have a contract initialised we can call its functions:
 
-In the project directory, you can run:
-
-```shell
-yarn start
+```javascript
+const getBalance = useCallback(async () => {
+  const result = await contract.userBalance(address);
+  const balanceFormatted = ethers.utils.formatEther(result);
+  setUserBalance(balanceFormatted);
+}, [contract, address]);
 ```
 
-or
+In this case we are calling the function `userBalance` to get some data from the contract. This function is a `read` one and does nor require gas and signing.
 
-```shell
-npm start
+```javascript
+const tx = await contract.deposit({ value: ethers.utils.parseEther(amount) });
 ```
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+In this case we are calling a `write` function called `deposit` which alters the state of the contract and requires a `signer` and some gas in order to be executed.

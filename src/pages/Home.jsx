@@ -10,6 +10,11 @@ function Home() {
           See styleguide
         </Link>
       </div>
+      <div className="mt-5">
+        <Link to="/quiz" className="btn btn-primary">
+          Quiz Game
+        </Link>
+      </div>
     </div>
   );
 }

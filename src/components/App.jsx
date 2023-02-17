@@ -7,6 +7,7 @@ import { publicProvider } from 'wagmi/providers/public';
 
 import Home from '../pages/Home';
 import Styleguide from '../pages/Styleguide';
+import Quiz from '../pages/Quiz';
 
 import Header from './layout/Header';
 import Footer from './layout/Footer';
@@ -28,6 +29,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="styleguide" element={<Styleguide />} />
+              <Route path="quiz" element={<Quiz />} />
             </Routes>
           </div>
           <Footer />

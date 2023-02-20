@@ -5,7 +5,7 @@ import Button from '../components/ui/Button';
 
 import quizFactory from '../abi/QuizFactory.json';
 import quizGame from '../abi/QuizGame.json';
-const FACTORY_CONTRACT_ADDRESS = '0x57a38Df7FF6300C2F8EE2C34A2c5eCf36C85666e';
+const FACTORY_CONTRACT_ADDRESS = '0xEa1754d29be0490f8a676eab5fF8D80F50E16b32';
 const salt = 'this is my salt';
 
 function Quiz() {
@@ -18,10 +18,12 @@ function Quiz() {
   const [isLoadingGuessGame, setIsLoadingGuessGame] = useState(false);
   const [createGameQuestion, setCreateGameQuestion] = useState('');
   const [createGameAnswer, setCreateGameAnswer] = useState('');
+  const [createGamePrize, setCreateGamePrize] = useState('');
   const [guessGameAnswer, setGuessGameAnswer] = useState('');
   const [gameContractDetails, setGameContractDetails] = useState();
   const [games, setGames] = useState();
   const [error, setError] = useState();
+  const [success, setSuccess] = useState();
 
   // Listen for changes in signer and load the Game Factory Contract
   useEffect(() => {
@@ -37,7 +39,7 @@ function Quiz() {
   }, [signer]);
 
   // Read the Game Factory contract for deployed games
-  const handleLoadGamesFromFactoryContract = async () => {
+  const handleGamesFromFactoryContract = async () => {
     setIsLoading(true);
     try {
       const results = await quizFactoryContract.getQuizzes();
@@ -56,7 +58,9 @@ function Quiz() {
       const hashedAnswer = ethers.utils.keccak256(
         ethers.utils.solidityPack(['string', 'string'], [salt, createGameAnswer]),
       );
-      const tx = await quizFactoryContract.createQuiz(createGameQuestion, hashedAnswer);
+      const tx = await quizFactoryContract.createQuiz(createGameQuestion, hashedAnswer, {
+        value: createGamePrize,
+      });
       await tx.wait();
       setCreateGameQuestion('');
       setCreateGameAnswer('');
@@ -64,7 +68,7 @@ function Quiz() {
       console.log('e', e);
     } finally {
       setIsLoadingCreateGame(false);
-      handleLoadGamesFromFactoryContract();
+      handleGamesFromFactoryContract();
     }
   };
 
@@ -80,7 +84,10 @@ function Quiz() {
   const getGameContractDetails = useCallback(async () => {
     const gameContractQuestion = await gameContract.question();
     const balance = await gameContract.getBalance();
-    setGameContractDetails({ question: gameContractQuestion, balance: balance.toString() });
+    setGameContractDetails({
+      question: gameContractQuestion,
+      balance: ethers.utils.formatEther(balance),
+    });
   }, [gameContract]);
 
   // Listen for changes in Game Contract and trigger to load the details
@@ -92,15 +99,18 @@ function Quiz() {
   const handlePlayGame = async () => {
     try {
       setError('');
+      setSuccess('');
       setIsLoadingGuessGame(true);
 
       const tx = await gameContract.guess(guessGameAnswer);
       await tx.wait();
       setGuessGameAnswer('');
+      setIsLoadingGuessGame(false);
+      getGameContractDetails();
+      setSuccess('The answer is correct! You win a prize!');
     } catch (e) {
       console.log('e', e);
       setError(e.reason);
-    } finally {
       setIsLoadingGuessGame(false);
     }
   };
@@ -113,6 +123,11 @@ function Quiz() {
   // Handle inputs for answer in deployment of a new game
   const handleCreateAnswerChange = event => {
     setCreateGameAnswer(event.target.value);
+  };
+
+  // Handle inputs for prize in deployment of a new game
+  const handleCreatePrizeChange = event => {
+    setCreateGamePrize(event.target.value);
   };
 
   // Handle inputs for answer in deployment of a new game
@@ -128,16 +143,13 @@ function Quiz() {
         {/* <Link to="/styleguide" className="btn btn-primary">
           See styleguide
         </Link> */}
-        <Button loading={isLoading} onClick={handleLoadGamesFromFactoryContract}>
+        <Button loading={isLoading} onClick={handleGamesFromFactoryContract}>
           Load Games from Factory Contract
         </Button>
       </div>
       {games && games.length > 0 && (
         <div className="container my-5">
           <div className="mt-5">
-            {/* <Button loading={isLoading} onClick={handleLoadGameContract}>
-            Load Game Contract
-          </Button> */}
             <div className="row">
               <div className="col-md-6">
                 <p className="text-main mt-3">There are currently {games.length} games:</p>
@@ -232,6 +244,17 @@ function Quiz() {
                   value={createGameAnswer}
                 />
               </div>
+              <div className="form-group">
+                <label htmlFor="answer">Prize</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  id="prize"
+                  placeholder="Prize"
+                  onChange={handleCreatePrizeChange}
+                  value={createGamePrize}
+                />
+              </div>
             </form>
             <Button loading={isLoadingCreateGame} onClick={handleCreateGame}>
               Create Game
@@ -240,7 +263,26 @@ function Quiz() {
         </div>
       )}
 
-      {error && <div className="col-12">{error}</div>}
+      {error && (
+        <div className="col-12">
+          <div
+            style={{ height: '64px', lineHeight: '64px', borderRadius: '2px' }}
+            className="mb-2 bg-danger text-white text-center "
+          >
+            {error}
+          </div>
+        </div>
+      )}
+      {success && (
+        <div className="col-12">
+          <div
+            style={{ height: '64px', lineHeight: '64px', borderRadius: '2px' }}
+            className="mb-2 bg-success text-white text-center "
+          >
+            {success}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

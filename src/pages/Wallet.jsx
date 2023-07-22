@@ -1,76 +1,52 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { ethers } from 'ethers';
-import { useSigner, useAccount } from 'wagmi';
+import { useContractWrite, useAccount, useContractRead } from 'wagmi';
 import walletABI from '../abi/Wallet.json';
 import Button from '../components/ui/Button';
 
-const Wallet = () => {
-  const { data: signer } = useSigner();
-  const { address } = useAccount();
+const contract = '0x9D9955688649A7071a032DBf1e565023E6775690';
 
-  const [contract, setContract] = useState();
-  const [userBalance, setUserBalance] = useState('0');
-  const [amount, setAmount] = useState('0');
-  const [isLoading, setIsLoading] = useState(false);
+const Wallet = () => {
+  const { address, isConnected } = useAccount();
+  const [amount, setAmount] = useState(0);
 
   const handleAmountChange = e => {
     const { value } = e.target;
     setAmount(value);
   };
 
-  useEffect(() => {
-    if (signer) {
-      const _contract = new ethers.Contract(
-        '0x9D9955688649A7071a032DBf1e565023E6775690',
-        walletABI,
-        signer,
-      );
+  const { data: userBalance } = useContractRead({
+    address: contract,
+    abi: walletABI,
+    functionName: 'userBalance',
+    args: [address],
+    enabled: isConnected,
+    watch: true,
+    onError(error) {
+      console.log('Error', error);
+    },
+  });
 
-      setContract(_contract);
-    }
-  }, [signer]);
+  const { isLoading: isLoadingDepositTx, write: writeDepositTx } = useContractWrite({
+    address: contract,
+    abi: walletABI,
+    functionName: 'deposit',
+    onSuccess() {
+      setAmount(0);
+    },
+    onError(error) {
+      console.log('Error', error);
+    },
+  });
 
-  const getBalance = useCallback(async () => {
-    const result = await contract.userBalance(address);
-    const balanceFormatted = ethers.utils.formatEther(result);
-    setUserBalance(balanceFormatted);
-  }, [contract, address]);
-
-  useEffect(() => {
-    contract && getBalance();
-  }, [contract, getBalance]);
-
-  const handleDepositButtonClick = async () => {
-    setIsLoading(true);
-
-    try {
-      const tx = await contract.deposit({ value: ethers.utils.parseEther(amount) });
-      await tx.wait();
-
-      setAmount('0');
-
-      await getBalance();
-    } catch (e) {
-      console.log('e', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleWithdrawButtonClick = async () => {
-    setIsLoading(true);
-
-    try {
-      const tx = await contract.withdraw();
-      await tx.wait();
-
-      await getBalance();
-    } catch (e) {
-      console.log('e', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { isLoading: isLoadingWithdraw, write: writeWithdrawTx } = useContractWrite({
+    address: contract,
+    abi: walletABI,
+    functionName: 'withdraw',
+    onError(error) {
+      console.log('Error', error);
+    },
+  });
 
   return (
     <div className="container my-5 my-lg-10">
@@ -87,17 +63,26 @@ const Wallet = () => {
               />
             </div>
             <div className="ms-3">
-              <Button loading={isLoading} onClick={handleDepositButtonClick} type="primary">
+              <Button
+                loading={isLoadingDepositTx}
+                disabled={!isConnected || !Number(amount)}
+                onClick={() =>
+                  writeDepositTx({
+                    value: ethers.parseEther(amount),
+                  })
+                }
+                type="primary"
+              >
                 Deposit
               </Button>
             </div>
           </div>
         </div>
       </div>
-      <div className="mt-5">{userBalance} ETH</div>
-      {Number(userBalance) > 0 ? (
+      <div className="mt-5">{ethers.formatEther(userBalance || '0')} ETH</div>
+      {isConnected && Number(userBalance) > 0 ? (
         <div className="mt-2">
-          <Button loading={isLoading} onClick={handleWithdrawButtonClick} type="primary">
+          <Button loading={isLoadingWithdraw} onClick={writeWithdrawTx} type="primary">
             Withdraw
           </Button>
         </div>

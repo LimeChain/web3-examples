@@ -12,6 +12,10 @@ const md5 = require('md5');
 function Header() {
   const connector = new MetaMaskConnector({
     chains: [sepolia],
+    options: {
+      shimDisconnect: true,
+      UNSTABLE_shimOnConnectSelectAccount: true,
+    },
   });
 
   const { isConnected, address } = useAccount();

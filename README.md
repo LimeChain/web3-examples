@@ -47,32 +47,36 @@ This library provides react hooks and components for easier connection.
 In `src/components/App.jsx` we import couple of components and variables for the connection:
 
 ```javascript
-import { WagmiConfig, configureChains, createClient } from 'wagmi';
+import { WagmiConfig, createConfig, configureChains } from 'wagmi';
+import { infuraProvider } from 'wagmi/providers/infura';
 import { sepolia } from 'wagmi/chains';
-import { publicProvider } from 'wagmi/providers/public';
 ```
 
-After that we get a provider from the `configureChains` function:
+After that we get an Infura provider, we need to pass the API KEY:
 
 ```javascript
-const { provider } = configureChains([sepolia], [publicProvider()]);
+const { publicClient, webSocketPublicClient } = configureChains(
+  [sepolia],
+  [infuraProvider({ apiKey: 'YOUR_INFURA_KEY' })],
+);
 ```
 
-Then we initialise a client with the `provider`:
+Then we initialize a config object with the `client`:
 
 ```javascript
-const client = createClient({
-  provider,
+const config = createConfig({
   autoConnect: true,
+  publicClient,
+  webSocketPublicClient,
 });
 ```
 
 Keep in mind that the provider is a public one and **does not contain** a signer!
 
-And finally wrap our application with a `WagmiConfig` component and a `client` prop provided:
+And finally wrap our application with a `WagmiConfig` component and a `config` prop provided:
 
 ```javascript
-<WagmiConfig client={client}>...</WagmiConfig>
+<WagmiConfig config={config}>...</WagmiConfig>
 ```
 
 Now we can use some of the [hooks](https://wagmi.sh/react/hooks/useAccount) provided by `wagmi` library.
@@ -99,6 +103,10 @@ initialising a `connector` object with the desired chain (imported also from `wa
 ```javascript
 const connector = new MetaMaskConnector({
   chains: [sepolia],
+  options: {
+    shimDisconnect: true,
+    UNSTABLE_shimOnConnectSelectAccount: true,
+  },
 });
 ```
 

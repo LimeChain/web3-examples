@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ethers } from 'ethers';
-import { useSigner } from 'wagmi';
+import React, { useState } from 'react';
+import { useContractWrite, useAccount, useContractRead } from 'wagmi';
+
 import electionABI from '../abi/Election.json';
 import Button from '../components/ui/Button';
 
 const Election = () => {
-  const { data: signer } = useSigner();
-  const contractAddress = '0x6F9D6E5Ac24507016FADda1898AadbE04b407df3';
-
+  const contract = '0xe02FeEe576e9F26a087b78f9c0Fe49Ff7ba0F76d';
+  const { isConnected } = useAccount();
+  const biden = 1;
+  const trump = 2;
   const electionMapping = {
     0: 'Tie',
     1: 'Biden',
@@ -21,28 +22,9 @@ const Election = () => {
     stateSeats: 0,
   };
 
-  // Contract states
-  const [contract, setContract] = useState();
-  const [contractData, setContractData] = useState({});
-  const [isLoadingContractData, setIsLoadingContractData] = useState(true);
-
   // Form states
   const [electionFromData, setElectionFormData] = useState(initialFormData);
-  const [isLoadingSubmit, setIsLoadingSubmit] = useState(false);
   const [formSubmitError, setFormSubmitError] = useState('');
-
-  const getContractData = useCallback(async () => {
-    setIsLoadingContractData(true);
-
-    const currentLeader = await contract.currentLeader();
-    const electionEnded = await contract.electionEnded();
-    const seatsBiden = await contract.seats(1);
-    const seatsTrump = await contract.seats(2);
-
-    setContractData({ currentLeader, electionEnded, seatsBiden, seatsTrump });
-
-    setIsLoadingContractData(false);
-  }, [contract]);
 
   // Handlers
   const handleFormInputChange = e => {
@@ -54,69 +36,108 @@ const Election = () => {
     }));
   };
 
-  const handleSubmitButtonClick = async () => {
-    setIsLoadingSubmit(true);
-    setFormSubmitError('');
+  const { data: currentLeader } = useContractRead({
+    address: contract,
+    abi: electionABI,
+    functionName: 'currentLeader',
+    enabled: isConnected,
+    watch: true,
+    onError(error) {
+      console.log('Error', error);
+    },
+  });
 
-    try {
-      const { name, votesBiden, votesTrump, stateSeats } = electionFromData;
+  const { data: seatsBiden } = useContractRead({
+    address: contract,
+    abi: electionABI,
+    functionName: 'seats',
+    args: [biden],
+    enabled: isConnected,
+    watch: true,
+    onError(error) {
+      console.log('Error', error);
+    },
+  });
 
-      const tx = await contract.submitStateResult([name, votesBiden, votesTrump, stateSeats]);
-      await tx.wait();
+  const { data: seatsTrump } = useContractRead({
+    address: contract,
+    abi: electionABI,
+    functionName: 'seats',
+    args: [trump],
+    enabled: isConnected,
+    watch: true,
+    onError(error) {
+      console.log('Error', error);
+    },
+  });
 
-      // const txResult = await tx.wait();
-      // const { status, transactionHash } = txResult;
+  const { data: electionEnded } = useContractRead({
+    address: contract,
+    abi: electionABI,
+    functionName: 'electionEnded',
+    enabled: isConnected,
+    watch: true,
+    onError(error) {
+      console.log('Error', error);
+    },
+  });
 
+  const { isLoading: isLoadingSubmitStateResult, write: writeStateResult } = useContractWrite({
+    address: contract,
+    abi: electionABI,
+    functionName: 'submitStateResult',
+    args: [
+      [
+        electionFromData.name,
+        electionFromData.votesBiden,
+        electionFromData.votesTrump,
+        electionFromData.stateSeats,
+      ],
+    ],
+    onSuccess() {
       setElectionFormData(initialFormData);
+    },
+    onError(error) {
+      console.log('Error', error);
+      setFormSubmitError(error);
+    },
+  });
 
-      await getContractData();
-    } catch (e) {
-      setFormSubmitError(e.reason);
-    } finally {
-      setIsLoadingSubmit(false);
-    }
-  };
+  const { isLoading: isLoadingEndElection, write: writeEndElection } = useContractWrite({
+    address: contract,
+    abi: electionABI,
+    functionName: 'endElection',
+    onSuccess() {
+      setElectionFormData(initialFormData);
+    },
+    onError(error) {
+      console.log('Error', error);
+      setFormSubmitError(error);
+    },
+  });
 
-  const handleEndElectionButtonClick = async () => {
-    setIsLoadingSubmit(true);
+  // // Use effects
+  // useEffect(() => {
+  //   if (isConnected) {
+  //     const electionContract = new ethers.Contract(contractAddress, electionABI, signer);
 
-    try {
-      const tx = await contract.endElection();
-      await tx.wait();
+  //     setContract(electionContract);
+  //   }
+  // }, [isConnected]);
 
-      // const txResult = await tx.wait();
-      // const { status, transactionHash } = txResult;
-
-      await getContractData();
-    } catch (e) {
-      setFormSubmitError(e.reason);
-    } finally {
-      setIsLoadingSubmit(false);
-    }
-  };
-
-  // Use effects
-  useEffect(() => {
-    if (signer) {
-      const electionContract = new ethers.Contract(contractAddress, electionABI, signer);
-
-      setContract(electionContract);
-    }
-  }, [signer]);
-
-  useEffect(() => {
-    contract && getContractData();
-  }, [contract, getContractData]);
+  // useEffect(() => {
+  //   contract && getContractData();
+  // }, [contract, getContractData]);
 
   return (
     <div className="container my-5 my-lg-10">
       <div className="row">
         <div className="col-6 offset-3">
           <h2 className="heading-medium text-center mb-5">Election</h2>
-          {isLoadingContractData ? (
+          {!isConnected ? (
             <div className="d-flex justify-content-center align-items-center">
-              <div class="spinner-border text-info" role="status">
-                <span class="visually-hidden">Loading...</span>
+              <div className="spinner-border text-info" role="status">
+                <span className="visually-hidden">Loading...</span>
               </div>
               <p className="text-center ms-3">Loading...</p>
             </div>
@@ -129,21 +150,17 @@ const Election = () => {
                     <div className="text-center">
                       <p>{electionMapping[1]}</p>
                       <p>
-                        <span class="badge text-bg-info text-small">{contractData.seatsBiden}</span>
+                        <span className="badge text-bg-info text-small">{seatsBiden}</span>
                       </p>
                     </div>
                     <div className="text-center">
-                      <p className="text-bold">
-                        Current {contractData.electionEnded ? 'winner' : 'leader'}
-                      </p>
-                      <p className="text-lead">{electionMapping[contractData.currentLeader]}</p>
+                      <p className="text-bold">Current {electionEnded ? 'winner' : 'leader'}</p>
+                      <p className="text-lead">{electionMapping[currentLeader]}</p>
                     </div>
                     <div className="text-center">
                       <p>{electionMapping[2]}</p>
                       <p>
-                        <span class="badge text-bg-danger text-small">
-                          {contractData.seatsTrump}
-                        </span>
+                        <span className="badge text-bg-danger text-small">{seatsTrump}</span>
                       </p>
                     </div>
                   </div>
@@ -151,7 +168,7 @@ const Election = () => {
               </div>
               <div className="card mt-5">
                 <div className="card-body">
-                  {contractData.electionEnded ? (
+                  {electionEnded ? (
                     <p>Election ended</p>
                   ) : (
                     <div className="">
@@ -205,8 +222,8 @@ const Election = () => {
 
                       <div className="mt-4 d-flex justify-content-center">
                         <Button
-                          onClick={handleSubmitButtonClick}
-                          loading={isLoadingSubmit}
+                          onClick={writeStateResult}
+                          loading={isLoadingSubmitStateResult}
                           type="primary"
                         >
                           Submit
@@ -214,8 +231,8 @@ const Election = () => {
 
                         <Button
                           className="ms-2"
-                          onClick={handleEndElectionButtonClick}
-                          loading={isLoadingSubmit}
+                          onClick={writeEndElection}
+                          loading={isLoadingEndElection}
                           type="secondary"
                         >
                           End election

@@ -76,32 +76,36 @@ This library provides react hooks and components for easier connection.
 In `src/components/App.jsx` we import couple of components and variables for the connection:
 
 ```javascript
-import { WagmiConfig, configureChains, createClient } from 'wagmi';
+import { WagmiConfig, createConfig, configureChains } from 'wagmi';
+import { infuraProvider } from 'wagmi/providers/infura';
 import { sepolia } from 'wagmi/chains';
-import { publicProvider } from 'wagmi/providers/public';
 ```
 
-After that we get a provider from the `configureChains` function:
+After that we get an Infura provider, we need to pass the API KEY:
 
 ```javascript
-const { provider } = configureChains([sepolia], [publicProvider()]);
+const { publicClient, webSocketPublicClient } = configureChains(
+  [sepolia],
+  [infuraProvider({ apiKey: 'YOUR_INFURA_KEY' })],
+);
 ```
 
-Then we initialise a client with the `provider`:
+Then we initialize a config object with the `client`:
 
 ```javascript
-const client = createClient({
-  provider,
+const config = createConfig({
   autoConnect: true,
+  publicClient,
+  webSocketPublicClient,
 });
 ```
 
 Keep in mind that the provider is a public one and **does not contain** a signer!
 
-And finally wrap our application with a `WagmiConfig` component and a `client` prop provided:
+And finally wrap our application with a `WagmiConfig` component and a `config` prop provided:
 
 ```javascript
-<WagmiConfig client={client}>...</WagmiConfig>
+<WagmiConfig config={config}>...</WagmiConfig>
 ```
 
 Now we can use some of the [hooks](https://wagmi.sh/react/hooks/useAccount) provided by `wagmi` library.
@@ -128,6 +132,10 @@ initialising a `connector` object with the desired chain (imported also from `wa
 ```javascript
 const connector = new MetaMaskConnector({
   chains: [sepolia],
+  options: {
+    shimDisconnect: true,
+    UNSTABLE_shimOnConnectSelectAccount: true,
+  },
 });
 ```
 
@@ -140,32 +148,72 @@ const { connect, isLoading } = useConnect({
 ```
 
 **Contract initialisation & interaction**
-For contract interaction we are using a library called [ethers.js](https://docs.ethers.org/v5/).
-This logic is in `src/pages/Election.jsx`.
-In order to create a contract object we initialise the `Contract` class from the `ethers` library:
+This logic is in src/pages/Election.jsx in branch `election`. In order to read a data from the contract, we are going to use the built-in hook - `useContractRead`:
+
+Let's read some contract data:
 
 ```javascript
-const electionContract = new ethers.Contract(contractAddress, electionABI, signer);
+const { data: currentLeader } = useContractRead({
+  address: contract,
+  abi: electionABI,
+  functionName: 'currentLeader',
+  enabled: isConnected,
+  watch: true,
+  onError(error) {
+    console.log('Error', error);
+  },
+});
 ```
 
 The first argument is the contract address, in our case is deployed at Sepolia test network.
-The second argument is the contract ABI, which is compiled from the contract itself. It's a `.json` file describing all the properties and functions of the contract.
-The third one is the `signer` object get from the `useSigner()` hook provided by `wagmi`:
+
+The second argument is the contract ABI, which is compiled from the contract itself. It's a .json file describing all the properties and functions of the contract.
+
+The third one is the function name.
+
+Then if the function is accepting arguments, we need to pass them in the `args` field.
+
+Then we can specify when this hook will be enabled. In our case on `isConnected`
+
+Then `watch` param is for watching changes in the state.
+
+Then the `onError` callback is for handling errors.
+
+In this case, we are calling the function userBalance to get some data from the contract.
+
+This function is a read one and does not require gas and signing.
+
+Please Note: Observe the file Election.jsx and the way the data is read and loaded.
+
+Let's see how we can call state change function and pass params:
 
 ```javascript
-const { data: signer } = useSigner();
+const { isLoading: isLoadingSubmitStateResult, write: writeStateResult } = useContractWrite({
+  address: contract,
+  abi: electionABI,
+  functionName: 'submitStateResult',
+  args: [
+    [
+      electionFromData.name,
+      electionFromData.votesBiden,
+      electionFromData.votesTrump,
+      electionFromData.stateSeats,
+    ],
+  ],
+  onSuccess() {
+    setElectionFormData(initialFormData);
+  },
+  onError(error) {
+    console.log('Error', error);
+    setFormSubmitError(error);
+  },
+});
 ```
 
-After we have a contract initialised we can call its functions:
+Please Note: Here the params are passed as one array.
+
+Please Note: If you need to pass value to the contract, you can use the following param:
 
 ```javascript
-const currentLeader = await contract.currentLeader();
+value: parseEther('0.01');
 ```
-
-In this case we are calling the function `currentLeader` to get some data from the contract. This function is a `read` one and does nor require gas and signing.
-
-```javascript
-const tx = await contract.submitStateResult([name, votesBiden, votesTrump, stateSeats]);
-```
-
-In this case we are calling a `write` function called `submitStateResult` which alters the state of the contract and requires a `signer` and some gas in order to be executed.

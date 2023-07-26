@@ -116,19 +116,6 @@ const Election = () => {
     },
   });
 
-  // // Use effects
-  // useEffect(() => {
-  //   if (isConnected) {
-  //     const electionContract = new ethers.Contract(contractAddress, electionABI, signer);
-
-  //     setContract(electionContract);
-  //   }
-  // }, [isConnected]);
-
-  // useEffect(() => {
-  //   contract && getContractData();
-  // }, [contract, getContractData]);
-
   return (
     <div className="container my-5 my-lg-10">
       <div className="row">

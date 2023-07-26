@@ -1,9 +1,9 @@
 import React from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
-import { WagmiConfig, configureChains, createClient } from 'wagmi';
+import { WagmiConfig, createConfig, configureChains } from 'wagmi';
+import { infuraProvider } from 'wagmi/providers/infura';
 import { sepolia } from 'wagmi/chains';
-import { publicProvider } from 'wagmi/providers/public';
 
 import Home from '../pages/Home';
 import Styleguide from '../pages/Styleguide';
@@ -12,16 +12,20 @@ import Header from './layout/Header';
 import Footer from './layout/Footer';
 
 function App() {
-  const { provider } = configureChains([sepolia], [publicProvider()]);
+  const { publicClient, webSocketPublicClient } = configureChains(
+    [sepolia],
+    [infuraProvider({ apiKey: '7e97ae83d8ee45fb816ddf90f5c29cdc' })],
+  );
 
-  const client = createClient({
-    provider,
+  const config = createConfig({
     autoConnect: true,
+    publicClient,
+    webSocketPublicClient,
   });
 
   return (
     <BrowserRouter>
-      <WagmiConfig client={client}>
+      <WagmiConfig config={config}>
         <div className="wrapper">
           <Header />
           <div className="main">
